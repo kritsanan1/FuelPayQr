@@ -76,6 +76,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Onboarding routes
+  app.get('/api/onboarding/user/:userId', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.params.userId || req.user.claims.sub;
+      let onboarding = await storage.getUserOnboarding(userId);
+      
+      if (!onboarding) {
+        onboarding = await storage.createUserOnboarding(userId);
+      }
+      
+      res.json(onboarding);
+    } catch (error) {
+      console.error("Error fetching user onboarding:", error);
+      res.status(500).json({ message: "Failed to fetch onboarding data" });
+    }
+  });
+
+  app.get('/api/onboarding/tutorial', isAuthenticated, async (req, res) => {
+    try {
+      const [steps, characters] = await Promise.all([
+        storage.getTutorialSteps(),
+        storage.getTutorialCharacters(),
+      ]);
+      
+      res.json({
+        steps,
+        characters: characters.reduce((acc, char) => {
+          acc[char.id] = char;
+          return acc;
+        }, {} as any),
+      });
+    } catch (error) {
+      console.error("Error fetching tutorial data:", error);
+      res.status(500).json({ message: "Failed to fetch tutorial data" });
+    }
+  });
+
+  app.post('/api/onboarding/progress', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { stepNumber, action } = req.body;
+      
+      const updated = await storage.updateOnboardingProgress(userId, stepNumber, action);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating onboarding progress:", error);
+      res.status(500).json({ message: "Failed to update progress" });
+    }
+  });
+
+  app.post('/api/onboarding/complete', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const completed = await storage.completeOnboarding(userId);
+      res.json(completed);
+    } catch (error) {
+      console.error("Error completing onboarding:", error);
+      res.status(500).json({ message: "Failed to complete onboarding" });
+    }
+  });
+
   // Create transaction and generate QR
   app.post('/api/transactions', isAuthenticated, async (req: any, res) => {
     try {

@@ -184,11 +184,73 @@ export const dailyBackups = pgTable("daily_backups", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// User onboarding and tutorial system
+export const userOnboarding = pgTable("user_onboarding", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  hasCompletedOnboarding: boolean("has_completed_onboarding").default(false),
+  currentStep: integer("current_step").default(0),
+  completedSteps: jsonb("completed_steps").default([]),
+  tutorialData: jsonb("tutorial_data").default({}),
+  lastActiveStep: timestamp("last_active_step").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Tutorial characters and messages
+export const tutorialCharacters = pgTable("tutorial_characters", {
+  id: serial("id").primaryKey(),
+  name: varchar("name").notNull(),
+  role: varchar("role").notNull(), // guide, helper, expert
+  avatar: varchar("avatar").notNull(),
+  description: text("description"),
+  personality: jsonb("personality").default({}),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Tutorial steps and messages
+export const tutorialSteps = pgTable("tutorial_steps", {
+  id: serial("id").primaryKey(),
+  stepNumber: integer("step_number").notNull(),
+  title: varchar("title").notNull(),
+  description: text("description"),
+  characterId: integer("character_id").references(() => tutorialCharacters.id),
+  message: text("message").notNull(),
+  actionRequired: varchar("action_required"), // click, form, wait, navigate
+  targetElement: varchar("target_element"),
+  isOptional: boolean("is_optional").default(false),
+  order: integer("order").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ one, many }) => ({
   employee: one(employees, {
     fields: [users.id],
     references: [employees.userId],
+  }),
+  onboarding: one(userOnboarding, {
+    fields: [users.id],
+    references: [userOnboarding.userId],
+  }),
+}));
+
+export const userOnboardingRelations = relations(userOnboarding, ({ one }) => ({
+  user: one(users, {
+    fields: [userOnboarding.userId],
+    references: [users.id],
+  }),
+}));
+
+export const tutorialCharactersRelations = relations(tutorialCharacters, ({ many }) => ({
+  steps: many(tutorialSteps),
+}));
+
+export const tutorialStepsRelations = relations(tutorialSteps, ({ one }) => ({
+  character: one(tutorialCharacters, {
+    fields: [tutorialSteps.characterId],
+    references: [tutorialCharacters.id],
   }),
 }));
 
@@ -263,6 +325,15 @@ export type FraudAlert = typeof fraudAlerts.$inferSelect;
 
 export type BankProvider = typeof bankProviders.$inferSelect;
 export type BankApiConfig = typeof bankApiConfigs.$inferSelect;
+
+export type InsertUserOnboarding = typeof userOnboarding.$inferInsert;
+export type UserOnboarding = typeof userOnboarding.$inferSelect;
+
+export type InsertTutorialCharacter = typeof tutorialCharacters.$inferInsert;
+export type TutorialCharacter = typeof tutorialCharacters.$inferSelect;
+
+export type InsertTutorialStep = typeof tutorialSteps.$inferInsert;
+export type TutorialStep = typeof tutorialSteps.$inferSelect;
 
 // Zod schemas
 export const insertEmployeeSchema = createInsertSchema(employees);

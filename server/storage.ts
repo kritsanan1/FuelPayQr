@@ -12,6 +12,9 @@ import {
   employeeSessions,
   webhookLogs,
   dailyBackups,
+  userOnboarding,
+  tutorialCharacters,
+  tutorialSteps,
   type User,
   type UpsertUser,
   type Employee,
@@ -22,6 +25,9 @@ import {
   type BankProvider,
   type Station,
   type CreateTransactionInput,
+  type UserOnboarding,
+  type TutorialCharacter,
+  type TutorialStep,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, gte, lte, count, sum, sql } from "drizzle-orm";
@@ -72,6 +78,14 @@ export interface IStorage {
     pendingPayments: number;
     fraudAlerts: number;
   }>;
+
+  // Onboarding operations
+  getUserOnboarding(userId: string): Promise<UserOnboarding | undefined>;
+  createUserOnboarding(userId: string): Promise<UserOnboarding>;
+  updateOnboardingProgress(userId: string, stepNumber: number, action: string): Promise<UserOnboarding>;
+  completeOnboarding(userId: string): Promise<UserOnboarding>;
+  getTutorialSteps(): Promise<(TutorialStep & { character: TutorialCharacter })[]>;
+  getTutorialCharacters(): Promise<TutorialCharacter[]>;
   
   // System operations
   logWebhook(log: any): Promise<void>;
@@ -362,6 +376,111 @@ export class DatabaseStorage implements IStorage {
       database: 'online',
       lastBackup: new Date().toISOString(),
     };
+  }
+
+  // Onboarding operations
+  async getUserOnboarding(userId: string): Promise<UserOnboarding | undefined> {
+    const [onboarding] = await db
+      .select()
+      .from(userOnboarding)
+      .where(eq(userOnboarding.userId, userId));
+    return onboarding;
+  }
+
+  async createUserOnboarding(userId: string): Promise<UserOnboarding> {
+    const [onboarding] = await db
+      .insert(userOnboarding)
+      .values({
+        userId,
+        hasCompletedOnboarding: false,
+        currentStep: 0,
+        completedSteps: [],
+        tutorialData: {},
+      })
+      .returning();
+    return onboarding;
+  }
+
+  async updateOnboardingProgress(userId: string, stepNumber: number, action: string): Promise<UserOnboarding> {
+    // Get current onboarding record
+    let onboarding = await this.getUserOnboarding(userId);
+    
+    if (!onboarding) {
+      onboarding = await this.createUserOnboarding(userId);
+    }
+
+    const completedSteps = Array.isArray(onboarding.completedSteps) 
+      ? onboarding.completedSteps as number[]
+      : [];
+    
+    const newCompletedSteps = action === 'completed' 
+      ? [...completedSteps, stepNumber]
+      : completedSteps;
+
+    const [updated] = await db
+      .update(userOnboarding)
+      .set({
+        currentStep: stepNumber,
+        completedSteps: newCompletedSteps,
+        lastActiveStep: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(userOnboarding.userId, userId))
+      .returning();
+
+    return updated;
+  }
+
+  async completeOnboarding(userId: string): Promise<UserOnboarding> {
+    const [updated] = await db
+      .update(userOnboarding)
+      .set({
+        hasCompletedOnboarding: true,
+        updatedAt: new Date(),
+      })
+      .where(eq(userOnboarding.userId, userId))
+      .returning();
+
+    return updated;
+  }
+
+  async getTutorialSteps(): Promise<(TutorialStep & { character: TutorialCharacter })[]> {
+    const steps = await db
+      .select({
+        id: tutorialSteps.id,
+        stepNumber: tutorialSteps.stepNumber,
+        title: tutorialSteps.title,
+        description: tutorialSteps.description,
+        characterId: tutorialSteps.characterId,
+        message: tutorialSteps.message,
+        actionRequired: tutorialSteps.actionRequired,
+        targetElement: tutorialSteps.targetElement,
+        isOptional: tutorialSteps.isOptional,
+        order: tutorialSteps.order,
+        createdAt: tutorialSteps.createdAt,
+        character: {
+          id: tutorialCharacters.id,
+          name: tutorialCharacters.name,
+          role: tutorialCharacters.role,
+          avatar: tutorialCharacters.avatar,
+          description: tutorialCharacters.description,
+          personality: tutorialCharacters.personality,
+          isActive: tutorialCharacters.isActive,
+          createdAt: tutorialCharacters.createdAt,
+        },
+      })
+      .from(tutorialSteps)
+      .leftJoin(tutorialCharacters, eq(tutorialSteps.characterId, tutorialCharacters.id))
+      .orderBy(tutorialSteps.order);
+
+    return steps as any;
+  }
+
+  async getTutorialCharacters(): Promise<TutorialCharacter[]> {
+    return await db
+      .select()
+      .from(tutorialCharacters)
+      .where(eq(tutorialCharacters.isActive, true));
   }
 }
 
@@ -687,6 +806,159 @@ export class MemoryStorage implements IStorage {
       lastBackup: new Date().toISOString(),
       storage: 'in-memory',
     };
+  }
+
+  // Onboarding operations (Memory storage implementation)
+  private onboardingData = new Map<string, UserOnboarding>();
+  private tutorialStepsData: (TutorialStep & { character: TutorialCharacter })[] = [];
+  private tutorialCharactersData: TutorialCharacter[] = [];
+
+  async getUserOnboarding(userId: string): Promise<UserOnboarding | undefined> {
+    return this.onboardingData.get(userId);
+  }
+
+  async createUserOnboarding(userId: string): Promise<UserOnboarding> {
+    const onboarding: UserOnboarding = {
+      id: this.nextId++,
+      userId,
+      hasCompletedOnboarding: false,
+      currentStep: 0,
+      completedSteps: [],
+      tutorialData: {},
+      lastActiveStep: new Date(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.onboardingData.set(userId, onboarding);
+    return onboarding;
+  }
+
+  async updateOnboardingProgress(userId: string, stepNumber: number, action: string): Promise<UserOnboarding> {
+    let onboarding = this.onboardingData.get(userId);
+    
+    if (!onboarding) {
+      onboarding = await this.createUserOnboarding(userId);
+    }
+
+    const completedSteps = Array.isArray(onboarding.completedSteps) 
+      ? onboarding.completedSteps as number[]
+      : [];
+    
+    const newCompletedSteps = action === 'completed' 
+      ? [...completedSteps, stepNumber]
+      : completedSteps;
+
+    const updated: UserOnboarding = {
+      ...onboarding,
+      currentStep: stepNumber,
+      completedSteps: newCompletedSteps,
+      lastActiveStep: new Date(),
+      updatedAt: new Date(),
+    };
+
+    this.onboardingData.set(userId, updated);
+    return updated;
+  }
+
+  async completeOnboarding(userId: string): Promise<UserOnboarding> {
+    let onboarding = this.onboardingData.get(userId);
+    
+    if (!onboarding) {
+      onboarding = await this.createUserOnboarding(userId);
+    }
+
+    const updated: UserOnboarding = {
+      ...onboarding,
+      hasCompletedOnboarding: true,
+      updatedAt: new Date(),
+    };
+
+    this.onboardingData.set(userId, updated);
+    return updated;
+  }
+
+  async getTutorialSteps(): Promise<(TutorialStep & { character: TutorialCharacter })[]> {
+    // Return default tutorial steps for memory storage
+    if (this.tutorialStepsData.length === 0) {
+      this.initializeTutorialData();
+    }
+    return this.tutorialStepsData;
+  }
+
+  async getTutorialCharacters(): Promise<TutorialCharacter[]> {
+    if (this.tutorialCharactersData.length === 0) {
+      this.initializeTutorialData();
+    }
+    return this.tutorialCharactersData;
+  }
+
+  private initializeTutorialData() {
+    // Initialize tutorial characters
+    this.tutorialCharactersData = [
+      {
+        id: 1,
+        name: 'Niran',
+        role: 'guide',
+        avatar: '🧑‍🏭',
+        description: 'A friendly fuel station manager who knows everything about the GasPay QR system',
+        personality: { traits: ['helpful', 'patient', 'encouraging'], greeting: 'สวัสดีครับ! (Hello!)', catchphrase: 'Let me show you the way!' },
+        isActive: true,
+        createdAt: new Date(),
+      },
+      {
+        id: 2,
+        name: 'Malee',
+        role: 'helper',
+        avatar: '👩‍💼',
+        description: 'An expert cashier who specializes in QR payments and customer service',
+        personality: { traits: ['detail-oriented', 'cheerful', 'efficient'], greeting: 'ยินดีที่ได้รู้จักค่ะ! (Nice to meet you!)', catchphrase: 'Every transaction matters!' },
+        isActive: true,
+        createdAt: new Date(),
+      },
+      {
+        id: 3,
+        name: 'Somchai',
+        role: 'expert',
+        avatar: '👨‍🔧',
+        description: 'A tech-savvy engineer who handles the technical aspects and troubleshooting',
+        personality: { traits: ['analytical', 'resourceful', 'calm'], greeting: 'เฮ้ยครับ! (Hey there!)', catchphrase: 'Technology made simple!' },
+        isActive: true,
+        createdAt: new Date(),
+      },
+    ];
+
+    // Initialize tutorial steps
+    this.tutorialStepsData = [
+      {
+        id: 1,
+        stepNumber: 1,
+        title: 'Welcome to GasPay QR!',
+        description: 'Get started with your Thai fuel station payment system',
+        characterId: 1,
+        message: 'สวัสดีครับ! Welcome to GasPay QR - Thailand\'s most advanced fuel station payment system! I\'m Niran, and I\'ll be your guide. Ready to learn how to make fuel payments as easy as ordering som tam? 🥗',
+        actionRequired: 'click',
+        targetElement: '#welcome-button',
+        isOptional: false,
+        order: 1,
+        createdAt: new Date(),
+        character: this.tutorialCharactersData[0],
+      },
+      {
+        id: 2,
+        stepNumber: 2,
+        title: 'Meet Your Dashboard',
+        description: 'Explore the main control center',
+        characterId: 1,
+        message: 'This is your dashboard - your command center! Here you can see today\'s sales, recent transactions, and system status. Think of it as your digital cash register, but much smarter! Let\'s take a look around.',
+        actionRequired: 'navigate',
+        targetElement: '#dashboard',
+        isOptional: false,
+        order: 2,
+        createdAt: new Date(),
+        character: this.tutorialCharactersData[0],
+      },
+      // Add more steps as needed...
+    ];
   }
 }
 
