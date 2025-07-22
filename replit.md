@@ -8,6 +8,16 @@ This is a full-stack web application for managing QR code-based payments at Thai
 
 Preferred communication style: Simple, everyday language.
 
+## Recent Changes
+
+### Migration to Replit Environment (July 22, 2025)
+- Successfully migrated from Replit Agent to standard Replit environment
+- Implemented fallback memory storage system for development when DATABASE_URL is not available
+- Modified authentication system to support both PostgreSQL and memory-based session storage
+- Added graceful database connection handling with fallback mechanisms
+- All core functionality preserved: Thai banking QR generation, payment monitoring, fraud detection
+- System now runs cleanly in Replit with proper security practices and client/server separation
+
 ## System Architecture
 
 The application follows a full-stack TypeScript architecture with a clear separation between client and server:
