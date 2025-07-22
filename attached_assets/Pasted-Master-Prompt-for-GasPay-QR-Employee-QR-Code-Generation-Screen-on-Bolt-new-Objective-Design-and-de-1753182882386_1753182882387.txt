@@ -1,0 +1,177 @@
+Master Prompt for GasPay QR Employee QR Code Generation Screen on Bolt.new
+Objective
+Design and develop a visually appealing, user-friendly QR Code Generation screen for employees in the GasPay QR application on Bolt.new. Integrate with a Thai bank API to generate QR codes with real transaction data, ensuring ease of use, professional aesthetics, and compliance with specified style guidelines.
+Platform
+
+Build on Bolt.new using no-code tools.
+Ensure compatibility with iOS, Android, and web browsers.
+Use Thai as the primary language.
+
+Screen Requirements
+1. Purpose
+
+Allow employees to input transaction details and generate a QR code linked to a Thai bank API.
+Display the QR code with real-time data (amount, order ID, timestamp) for customer scanning.
+Provide visual feedback with smooth animations.
+
+2. Layout and Components
+
+Header:
+Title: “สร้าง QR Code” in Poppins, bold, 24px, Petrol Blue (#367FA9).
+Icon: Gas pump (Google Material Icons or Bolt.new’s library).
+
+
+Input Form:
+Fields:
+Fuel Type: Dropdown (“Gasoline 95,” “Diesel,” “E20”) in PT Sans, 16px.
+Liters: Numeric input (optional).
+Total Amount (THB): Numeric input with pre-set buttons (500, 1000, 2000 THB) in Fire Engine Red (#D14906).
+
+
+Labels in PT Sans, 16px, Petrol Blue (#367FA9).
+Inputs with rounded borders (8px) and Very Light Blue (#EBF4FA) background.
+
+
+Generate Button:
+Button: “สร้าง QR Code” in Poppins, bold, 18px, Fire Engine Red (#D14906) with white text.
+Icon: QR code or cash icon inside button.
+Full-width, 10px padding, hover effect (scale 1.05x).
+
+
+QR Code Display Area:
+300x300px box, white background, Petrol Blue (#367FA9) border (2px).
+Transaction details below:
+“จำนวน: ฿[amount]” in PT Sans, 16px.
+“รหัสคำสั่งซื้อ: [order_id]” in PT Sans, 16px.
+“เวลา: [timestamp]” in PT Sans, 16px.
+
+
+Loading spinner (Fire Engine Red #D14906) with fade-in animation for QR code.
+
+
+Background: Very Light Blue (#EBF4FA).
+Navigation: Back button (arrow-left, #367FA9) in top-left; optional bottom navigation bar (Home, Transaction History, Logout).
+
+3. Functionality
+
+Input Handling:
+Validate inputs (amount >0, ≤100,000 THB) in Bolt.new’s form settings.
+Auto-generate order ID (e.g., “ORDER-[timestamp]-[employee_id]”).
+
+
+QR Code Generation:
+Call Thai bank API (e.g., SCB, Bangkok Bank, Kasikornbank, PromptPay) via Bolt.new’s API connector.
+Embed merchant ID, amount, order ID, timestamp in Thai QR Code Tag 30 or QR CS format.
+Fallback to QRCode Monkey API if needed.
+Set 5-minute expiration using Bolt.new’s timer workflow.
+
+
+Animations:
+Fade-in (0.5s) for QR code and details.
+Slide-in (0.3s) for error messages in Fire Engine Red (#D14906).
+
+
+Error Handling:
+Display errors (e.g., “Invalid amount”) below form in PT Sans, 14px, Fire Engine Red (#D14906).
+Log errors in database.
+
+
+
+4. Style Guidelines
+
+Colors:
+Primary: Petrol Blue (#367FA9) for headers, labels, borders.
+Background: Very Light Blue (#EBF4FA).
+Accent: Fire Engine Red (#D14906) for buttons, error messages.
+
+
+Fonts (Google Fonts):
+Headline: Poppins, bold.
+Body: PT Sans, regular.
+
+
+Icons: Fuel/money icons (gas pump, cash, QR code) from Google Material Icons or Bolt.new.
+Layout: Grid-based, 16px spacing, centered content, rounded corners (8px).
+Animations: Fade-in for QR code, slide-in for errors, hover effects for buttons.
+
+Technical Setup
+
+Database:
+Store in Bolt.new’s database:
+Transactions: transaction_id, employee_id, amount, timestamp, status, order_id.
+Users: user_id, username, password (encrypted), role.
+
+
+Log QR generation attempts for fraud detection.
+
+
+Bank API Integration:
+Register with bank’s developer portal (e.g., developer.scb, apiportal.bangkokbank.com).
+Configure API keys/OAuth in Bolt.new’s API connector.
+Use bank API for QR code generation (e.g., SCB: POST /qr/generate).
+Test in sandbox environment.
+
+
+Security:
+Use Bolt.new’s authentication for employee login.
+Ensure HTTPS for API calls.
+Restrict employees to QR generation using RBAC.
+
+
+
+Setup and Deployment
+
+Initial Setup:
+Create Bolt.new project: “GasPay QR.”
+Set up Transactions table.
+Configure Thai language.
+
+
+Bank API Setup:
+Obtain bank API credentials.
+Add API endpoints in Bolt.new (e.g., SCB QR Generation: POST /qr/generate).
+Test in sandbox.
+
+
+UI Development:
+Create QR Generation screen in Bolt.new’s design editor:
+Header: “สร้าง QR Code” (Poppins, 24px, #367FA9).
+Form: Fuel type dropdown, liters/amount inputs, pre-set buttons (#D14906).
+QR display: 300x300px, white background, #367FA9 border.
+Button: “สร้าง QR Code” (Poppins, 18px, #D14906).
+
+
+Apply #EBF4FA background, PT Sans for text.
+
+
+Workflows:
+Workflow: Validate input → Generate order ID → Call bank API → Display QR with fade-in.
+Handle errors and display messages (#D14906).
+Set 5-minute QR expiration.
+
+
+Testing:
+Test in Bolt.new’s preview mode with bank sandbox APIs.
+Simulate transactions (1000 THB, Gasoline 95, order_id: ORDER-20250722-emp001).
+Verify animations and validation.
+
+
+Deployment:
+Publish via Bolt.new for web, iOS, Android.
+Provide web URL or app store links.
+Test responsiveness.
+
+
+
+Deliverables
+
+Functional QR Code Generation screen in GasPay QR on Bolt.new.
+Documentation (PDF or Bolt.new) covering setup and usage.
+Test environment with sample data.
+
+Constraints
+
+Use Bolt.new’s no-code tools.
+Comply with Thai financial regulations.
+Store data in Bolt.new’s cloud database.
+Limit transactions to 100,000 THB per transaction, 500,000 THB daily.
