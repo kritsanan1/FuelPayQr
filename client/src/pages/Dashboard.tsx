@@ -5,9 +5,10 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import Navigation from "@/components/Navigation";
 import DashboardStats from "@/components/DashboardStats";
-import QRGenerator from "@/components/QRGenerator";
+import EnhancedQRGenerator from "@/components/EnhancedQRGenerator";
+import RealTimePaymentMonitor from "@/components/RealTimePaymentMonitor";
 import RecentTransactions from "@/components/RecentTransactions";
-import PaymentMonitor from "@/components/PaymentMonitor";
+// import PaymentMonitor from "@/components/PaymentMonitor";
 import BankingStatus from "@/components/BankingStatus";
 import SecurityAlerts from "@/components/SecurityAlerts";
 import PaymentModal from "@/components/PaymentModal";
@@ -63,13 +64,13 @@ export default function Dashboard() {
           
           {/* Left Column: QR Generation */}
           <div className="lg:col-span-2 space-y-6">
-            <QRGenerator />
+            <EnhancedQRGenerator />
             <RecentTransactions />
           </div>
           
           {/* Right Column: Payment Status & System Info */}
           <div className="space-y-6">
-            <PaymentMonitor />
+            <RealTimePaymentMonitor autoStart={true} />
             <BankingStatus />
             <SecurityAlerts />
           </div>

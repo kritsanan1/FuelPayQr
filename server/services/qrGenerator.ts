@@ -1,4 +1,5 @@
 import QRCode from 'qrcode';
+import { PromptPayService } from './promptPayService';
 
 export interface QRGenerationData {
   transactionId: string;
@@ -13,29 +14,64 @@ export interface QRResult {
 }
 
 export class QRGenerator {
+  private promptPayService: PromptPayService;
+
+  constructor() {
+    this.promptPayService = new PromptPayService();
+  }
+
   async generateQR(data: QRGenerationData): Promise<QRResult> {
     try {
-      const qrData = this.formatQRData(data);
-      const qrCode = await QRCode.toDataURL(qrData.payload, {
-        errorCorrectionLevel: 'M',
-        type: 'image/png',
-        quality: 0.92,
-        margin: 1,
-        color: {
-          dark: '#000000',
-          light: '#FFFFFF'
-        },
-        width: 300,
-      });
+      let qrResult;
 
-      return {
-        qrCode,
-        data: qrData,
-      };
+      // Use advanced bank-specific QR generation
+      switch (data.bankProvider) {
+        case 'promptpay':
+          qrResult = await this.generateAdvancedPromptPayQR(data);
+          break;
+        
+        case 'bbl':
+          qrResult = await this.generateBangkokBankQR(data);
+          break;
+        
+        case 'scb':
+          qrResult = await this.generateSCBQR(data);
+          break;
+        
+        case 'kasikorn':
+          qrResult = await this.generateKasikornQR(data);
+          break;
+        
+        default:
+          qrResult = await this.generateAdvancedPromptPayQR(data);
+      }
+
+      return qrResult;
     } catch (error) {
       console.error('Error generating QR code:', error);
       throw new Error('Failed to generate QR code');
     }
+  }
+
+  private async generateAdvancedPromptPayQR(data: QRGenerationData): Promise<QRResult> {
+    const promptPayData = {
+      amount: data.amount,
+      merchantId: data.merchantId,
+      transactionRef: data.transactionId,
+      phoneNumber: '0891234567', // Default merchant phone
+    };
+
+    const result = await this.promptPayService.generatePromptPayQR(promptPayData);
+
+    return {
+      qrCode: result.qrCode,
+      data: {
+        ...result.qrData,
+        bankProvider: 'promptpay',
+        format: 'emv_qr',
+        expiresAt: result.expiresAt,
+      },
+    };
   }
 
   private formatQRData(data: QRGenerationData): any {

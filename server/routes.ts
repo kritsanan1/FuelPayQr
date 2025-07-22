@@ -137,6 +137,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Enhanced QR generation route
+  app.post('/api/qr/generate', isAuthenticated, async (req, res) => {
+    try {
+      const { amount, bankProvider, fuelType, pumpNumber, customerPhone, transactionId } = req.body;
+      
+      // Create transaction record
+      const transaction = await storage.createTransaction({
+        transactionId,
+        amount: amount.toString(),
+        bankProvider,
+        status: 'pending',
+        fuelType,
+        pumpNumber,
+        customerPhone,
+        employeeId: (req as any).user.claims.sub,
+      });
+
+      // Generate enhanced QR code
+      const qrGenerator = new (await import('../services/qrGenerator')).QRGenerator();
+      const qrResult = await qrGenerator.generateQR({
+        transactionId,
+        amount,
+        bankProvider,
+        merchantId: `GASPAY_${pumpNumber}`,
+      });
+
+      res.json({
+        ...qrResult.data,
+        qrCode: qrResult.qrCode,
+        transactionId: transaction.id,
+        amount,
+        bankProvider,
+        status: 'pending',
+        expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes
+      });
+    } catch (error) {
+      console.error("Enhanced QR generation error:", error);
+      res.status(500).json({ message: "Failed to generate enhanced QR code" });
+    }
+  });
+
   // Create transaction and generate QR
   app.post('/api/transactions', isAuthenticated, async (req: any, res) => {
     try {
