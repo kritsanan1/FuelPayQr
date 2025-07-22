@@ -29,11 +29,21 @@ export function getSession() {
   let sessionStore;
   
   if (process.env.DATABASE_URL) {
+    // Clean the DATABASE_URL in case it has extra formatting
+    let databaseUrl = process.env.DATABASE_URL;
+    
+    // Remove psql command wrapper if present
+    if (databaseUrl.startsWith("psql '") && databaseUrl.endsWith("'")) {
+      databaseUrl = databaseUrl.slice(6, -1);
+    } else if (databaseUrl.startsWith('psql ')) {
+      databaseUrl = databaseUrl.slice(5);
+    }
+    
     // Use PostgreSQL for session storage
     const pgStore = connectPg(session);
     sessionStore = new pgStore({
-      conString: process.env.DATABASE_URL,
-      createTableIfMissing: false,
+      conString: databaseUrl,
+      createTableIfMissing: true,
       ttl: sessionTtl,
       tableName: "sessions",
     });

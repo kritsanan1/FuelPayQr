@@ -10,7 +10,17 @@ let pool: Pool | null = null;
 let db: any = null;
 
 if (process.env.DATABASE_URL) {
-  pool = new Pool({ connectionString: process.env.DATABASE_URL });
+  // Clean the DATABASE_URL in case it has extra formatting
+  let databaseUrl = process.env.DATABASE_URL;
+  
+  // Remove psql command wrapper if present
+  if (databaseUrl.startsWith("psql '") && databaseUrl.endsWith("'")) {
+    databaseUrl = databaseUrl.slice(6, -1);
+  } else if (databaseUrl.startsWith('psql ')) {
+    databaseUrl = databaseUrl.slice(5);
+  }
+  
+  pool = new Pool({ connectionString: databaseUrl });
   db = drizzle({ client: pool, schema });
   console.log('✓ Connected to PostgreSQL database');
 } else {
