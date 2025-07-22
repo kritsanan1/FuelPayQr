@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLanguage } from "@/hooks/useLanguage";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle } from "lucide-react";
 
@@ -66,9 +66,9 @@ export default function FraudAlertModal({
             <AlertTriangle className="h-8 w-8 text-fire-red" />
           </div>
           
-          <h3 className="text-2xl font-poppins font-bold text-gray-900 mb-2">
+          <DialogTitle className="text-2xl font-poppins font-bold text-gray-900 mb-2">
             Security Alert
-          </h3>
+          </DialogTitle>
           <p className="text-gray-600 mb-6">
             Suspicious activity detected
           </p>

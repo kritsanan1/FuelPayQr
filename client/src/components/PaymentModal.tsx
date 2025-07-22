@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLanguage } from "@/hooks/useLanguage";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { CheckCircle } from "lucide-react";
 import { formatCurrency } from "@/lib/i18n";
@@ -61,9 +61,9 @@ export default function PaymentModal({
             <CheckCircle className="h-8 w-8 text-success-green" />
           </div>
           
-          <h3 className="text-2xl font-poppins font-bold text-gray-900 mb-2">
+          <DialogTitle className="text-2xl font-poppins font-bold text-gray-900 mb-2">
             Payment Confirmed!
-          </h3>
+          </DialogTitle>
           <p className="text-gray-600 mb-6">
             Transaction completed successfully
           </p>
