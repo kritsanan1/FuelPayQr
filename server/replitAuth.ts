@@ -57,13 +57,25 @@ function updateUserSession(
 async function upsertUser(
   claims: any,
 ) {
-  await storage.upsertUser({
+  const user = await storage.upsertUser({
     id: claims["sub"],
     email: claims["email"],
     firstName: claims["first_name"],
     lastName: claims["last_name"],
     profileImageUrl: claims["profile_image_url"],
   });
+
+  // Create default employee profile if doesn't exist
+  const existingEmployee = await storage.getEmployeeByUserId(user.id);
+  if (!existingEmployee) {
+    await storage.createEmployee({
+      userId: user.id,
+      employeeId: `EMP-${user.id.slice(-6)}`,
+      role: 'employee',
+      stationId: 'DEMO001', // Default demo station
+      isActive: true,
+    });
+  }
 }
 
 export async function setupAuth(app: Express) {
