@@ -365,4 +365,330 @@ export class DatabaseStorage implements IStorage {
   }
 }
 
-export const storage = new DatabaseStorage();
+// Memory storage implementation for development/fallback
+export class MemoryStorage implements IStorage {
+  private users = new Map<string, User>();
+  private employees = new Map<number, Employee>();
+  private stations = new Map<string, Station>();
+  private transactions = new Map<number, Transaction>();
+  private qrPayments = new Map<number, QRPayment>();
+  private paymentConfirmations = new Map<number, PaymentConfirmation>();
+  private fraudAlerts = new Map<number, FraudAlert>();
+  private bankProviders = new Map<string, BankProvider>();
+  private nextId = 1;
+
+  constructor() {
+    // Initialize with default data
+    this.initializeDefaultData();
+  }
+
+  private initializeDefaultData() {
+    // Default bank providers
+    const defaultBanks: BankProvider[] = [
+      {
+        id: 1,
+        code: 'promptpay',
+        name: 'PromptPay',
+        displayName: 'PromptPay',
+        apiEndpoint: 'https://api.promptpay.io',
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: 2,
+        code: 'bbl',
+        name: 'Bangkok Bank',
+        displayName: 'Bangkok Bank',
+        apiEndpoint: 'https://api.bangkokbank.com',
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: 3,
+        code: 'scb',
+        name: 'Siam Commercial Bank',
+        displayName: 'SCB',
+        apiEndpoint: 'https://api.scb.co.th',
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: 4,
+        code: 'kasikorn',
+        name: 'Kasikornbank',
+        displayName: 'K-Bank',
+        apiEndpoint: 'https://api.kasikornbank.com',
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ];
+
+    defaultBanks.forEach(bank => {
+      this.bankProviders.set(bank.code, bank);
+    });
+
+    // Default station
+    const defaultStation: Station = {
+      id: 'STATION001',
+      name: 'Demo Gas Station',
+      address: '123 Main Street, Bangkok, Thailand',
+      phone: '+66-2-123-4567',
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.stations.set(defaultStation.id, defaultStation);
+  }
+
+  // User operations - mandatory for Replit Auth
+  async getUser(id: string): Promise<User | undefined> {
+    return this.users.get(id);
+  }
+
+  async upsertUser(userData: UpsertUser): Promise<User> {
+    const user: User = {
+      id: userData.id!,
+      email: userData.email ?? null,
+      firstName: userData.firstName ?? null,
+      lastName: userData.lastName ?? null,
+      profileImageUrl: userData.profileImageUrl ?? null,
+      updatedAt: new Date(),
+      createdAt: this.users.has(userData.id!) ? this.users.get(userData.id!)!.createdAt : new Date(),
+    };
+    this.users.set(user.id, user);
+    return user;
+  }
+
+  // Employee operations
+  async getEmployeeByUserId(userId: string): Promise<Employee | undefined> {
+    return Array.from(this.employees.values()).find(emp => emp.userId === userId);
+  }
+
+  async getEmployeeByEmployeeId(employeeId: string): Promise<Employee | undefined> {
+    return Array.from(this.employees.values()).find(emp => emp.employeeId === employeeId);
+  }
+
+  async createEmployee(employeeData: Partial<Employee>): Promise<Employee> {
+    const employee: Employee = {
+      id: this.nextId++,
+      userId: employeeData.userId || null,
+      employeeId: employeeData.employeeId || `EMP${Date.now()}`,
+      stationId: employeeData.stationId || 'STATION001',
+      role: employeeData.role || 'employee',
+      isActive: employeeData.isActive ?? true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.employees.set(employee.id, employee);
+    return employee;
+  }
+
+  // Station operations
+  async getStation(id: string): Promise<Station | undefined> {
+    return this.stations.get(id);
+  }
+
+  async getAllStations(): Promise<Station[]> {
+    return Array.from(this.stations.values()).filter(station => station.isActive);
+  }
+
+  // Transaction operations
+  async createTransaction(data: CreateTransactionInput & { employeeId: number; stationId: string }): Promise<Transaction> {
+    const transactionId = `TXN-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Date.now().toString().slice(-6)}`;
+    
+    const transaction: Transaction = {
+      id: this.nextId++,
+      transactionId,
+      employeeId: data.employeeId,
+      stationId: data.stationId,
+      pumpNumber: data.pumpNumber,
+      fuelType: data.fuelType,
+      amount: data.amount,
+      liters: data.liters || null,
+      pricePerLiter: null,
+      customerPhone: data.customerPhone || null,
+      status: 'pending',
+      bankProvider: data.bankProvider,
+      paymentReference: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      expiresAt: new Date(Date.now() + 5 * 60 * 1000), // 5 minutes
+    };
+    
+    this.transactions.set(transaction.id, transaction);
+    return transaction;
+  }
+
+  async getTransaction(id: number): Promise<Transaction | undefined> {
+    return this.transactions.get(id);
+  }
+
+  async getTransactionByTransactionId(transactionId: string): Promise<Transaction | undefined> {
+    return Array.from(this.transactions.values()).find(txn => txn.transactionId === transactionId);
+  }
+
+  async updateTransactionStatus(id: number, status: string, paymentReference?: string): Promise<Transaction> {
+    const transaction = this.transactions.get(id);
+    if (!transaction) {
+      throw new Error(`Transaction ${id} not found`);
+    }
+    
+    const updated: Transaction = {
+      ...transaction,
+      status,
+      paymentReference: paymentReference || transaction.paymentReference,
+      updatedAt: new Date(),
+    };
+    
+    this.transactions.set(id, updated);
+    return updated;
+  }
+
+  async getRecentTransactions(limit = 10): Promise<Transaction[]> {
+    return Array.from(this.transactions.values())
+      .sort((a, b) => b.createdAt!.getTime() - a.createdAt!.getTime())
+      .slice(0, limit);
+  }
+
+  async getTransactionsByStation(stationId: string, limit = 10): Promise<Transaction[]> {
+    return Array.from(this.transactions.values())
+      .filter(txn => txn.stationId === stationId)
+      .sort((a, b) => b.createdAt!.getTime() - a.createdAt!.getTime())
+      .slice(0, limit);
+  }
+
+  async getTransactionsByEmployee(employeeId: number, limit = 10): Promise<Transaction[]> {
+    return Array.from(this.transactions.values())
+      .filter(txn => txn.employeeId === employeeId)
+      .sort((a, b) => b.createdAt!.getTime() - a.createdAt!.getTime())
+      .slice(0, limit);
+  }
+
+  // QR Payment operations
+  async createQRPayment(qrPaymentData: Partial<QRPayment>): Promise<QRPayment> {
+    const qrPayment: QRPayment = {
+      id: this.nextId++,
+      transactionId: qrPaymentData.transactionId!,
+      qrCode: qrPaymentData.qrCode!,
+      qrData: qrPaymentData.qrData!,
+      bankProvider: qrPaymentData.bankProvider!,
+      status: qrPaymentData.status || 'active',
+      createdAt: new Date(),
+      expiresAt: new Date(Date.now() + 5 * 60 * 1000), // 5 minutes
+    };
+    this.qrPayments.set(qrPayment.id, qrPayment);
+    return qrPayment;
+  }
+
+  async getQRPaymentByTransaction(transactionId: number): Promise<QRPayment | undefined> {
+    return Array.from(this.qrPayments.values()).find(qr => qr.transactionId === transactionId);
+  }
+
+  // Payment confirmation operations
+  async createPaymentConfirmation(confirmationData: Partial<PaymentConfirmation>): Promise<PaymentConfirmation> {
+    const confirmation: PaymentConfirmation = {
+      id: this.nextId++,
+      transactionId: confirmationData.transactionId!,
+      bankReference: confirmationData.bankReference || null,
+      confirmationData: confirmationData.confirmationData || null,
+      confirmedAt: new Date(),
+      amount: confirmationData.amount || null,
+      status: confirmationData.status!,
+    };
+    this.paymentConfirmations.set(confirmation.id, confirmation);
+    return confirmation;
+  }
+
+  // Fraud detection operations
+  async getFraudPatterns(): Promise<any[]> {
+    return [];
+  }
+
+  async createFraudAlert(alertData: Partial<FraudAlert>): Promise<FraudAlert> {
+    const alert: FraudAlert = {
+      id: this.nextId++,
+      transactionId: alertData.transactionId || null,
+      patternId: alertData.patternId || null,
+      riskScore: alertData.riskScore || null,
+      description: alertData.description || null,
+      status: alertData.status || 'active',
+      createdAt: new Date(),
+      resolvedAt: null,
+    };
+    this.fraudAlerts.set(alert.id, alert);
+    return alert;
+  }
+
+  async getActiveFraudAlerts(): Promise<FraudAlert[]> {
+    return Array.from(this.fraudAlerts.values())
+      .filter(alert => alert.status === 'active')
+      .sort((a, b) => b.createdAt!.getTime() - a.createdAt!.getTime());
+  }
+
+  // Banking operations
+  async getBankProviders(): Promise<BankProvider[]> {
+    return Array.from(this.bankProviders.values()).filter(provider => provider.isActive);
+  }
+
+  async getBankProvider(code: string): Promise<BankProvider | undefined> {
+    const provider = this.bankProviders.get(code);
+    return provider?.isActive ? provider : undefined;
+  }
+
+  // Analytics operations
+  async getDashboardStats(stationId?: string): Promise<{
+    todaySales: number;
+    todayTransactions: number;
+    pendingPayments: number;
+    fraudAlerts: number;
+  }> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const allTransactions = Array.from(this.transactions.values());
+    
+    const todayTransactions = allTransactions.filter(txn => {
+      const created = new Date(txn.createdAt!);
+      const matchesStation = !stationId || txn.stationId === stationId;
+      const isToday = created >= today && created < tomorrow;
+      return matchesStation && isToday;
+    });
+
+    const completedSales = todayTransactions
+      .filter(txn => txn.status === 'completed')
+      .reduce((sum, txn) => sum + parseFloat(txn.amount), 0);
+
+    const pendingPayments = allTransactions.filter(txn => txn.status === 'pending').length;
+    const fraudAlerts = Array.from(this.fraudAlerts.values()).filter(alert => alert.status === 'active').length;
+
+    return {
+      todaySales: completedSales,
+      todayTransactions: todayTransactions.length,
+      pendingPayments,
+      fraudAlerts,
+    };
+  }
+
+  // System operations
+  async logWebhook(logData: any): Promise<void> {
+    // In memory storage, we just log to console
+    console.log('Webhook logged:', logData);
+  }
+
+  async getSystemStatus(): Promise<any> {
+    return {
+      database: 'memory',
+      lastBackup: new Date().toISOString(),
+      storage: 'in-memory',
+    };
+  }
+}
+
+// Use memory storage if DATABASE_URL is not available, otherwise use database storage
+export const storage = process.env.DATABASE_URL ? new DatabaseStorage() : new MemoryStorage();

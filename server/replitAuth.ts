@@ -6,6 +6,7 @@ import session from "express-session";
 import type { Express, RequestHandler } from "express";
 import memoize from "memoizee";
 import connectPg from "connect-pg-simple";
+import MemoryStore from "memorystore";
 import { storage } from "./storage";
 
 if (!process.env.REPLIT_DOMAINS) {
@@ -24,21 +25,36 @@ const getOidcConfig = memoize(
 
 export function getSession() {
   const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
-  const pgStore = connectPg(session);
-  const sessionStore = new pgStore({
-    conString: process.env.DATABASE_URL,
-    createTableIfMissing: false,
-    ttl: sessionTtl,
-    tableName: "sessions",
-  });
+  
+  let sessionStore;
+  
+  if (process.env.DATABASE_URL) {
+    // Use PostgreSQL for session storage
+    const pgStore = connectPg(session);
+    sessionStore = new pgStore({
+      conString: process.env.DATABASE_URL,
+      createTableIfMissing: false,
+      ttl: sessionTtl,
+      tableName: "sessions",
+    });
+    console.log('✓ Using PostgreSQL session store');
+  } else {
+    // Use memory store for development/fallback
+    const memStore = MemoryStore(session);
+    sessionStore = new memStore({
+      checkPeriod: 86400000, // prune expired entries every 24h
+    });
+    console.log('ℹ Using memory session store');
+  }
+  
   return session({
-    secret: process.env.SESSION_SECRET!,
+    secret: process.env.SESSION_SECRET || 'development-secret-key-change-in-production',
     store: sessionStore,
     resave: false,
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      secure: true,
+      secure: process.env.NODE_ENV === 'production',
       maxAge: sessionTtl,
     },
   });
@@ -72,7 +88,7 @@ async function upsertUser(
       userId: user.id,
       employeeId: `EMP-${user.id.slice(-6)}`,
       role: 'employee',
-      stationId: 'DEMO001', // Default demo station
+      stationId: 'STATION001', // Default demo station
       isActive: true,
     });
   }
